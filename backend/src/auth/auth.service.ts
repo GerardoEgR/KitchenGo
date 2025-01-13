@@ -6,24 +6,25 @@ import {
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { InjectRepository } from "@nestjs/typeorm";
-
-import { CreateUserDto } from "./dto/create-user.dto";
-import { User } from "./entities/user.entity";
 import { Repository } from "typeorm";
+
 import * as bcrypt from "bcrypt";
-import { LoginUserDto } from "./dto";
+
+import { User } from "./entities/user.entity";
+import { LoginUserDto, CreateUserDto } from "./dto";
 import { JwtPayload } from "./interfaces/jwt-payload.interface";
-type UserWithToken = CreateUserDto & { token: string };
 
 @Injectable()
 export class AuthService {
+
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    private readonly jwtService: JwtService,
-  ) {}
 
-  async create(createUserDto: CreateUserDto): Promise<UserWithToken> {
+    private readonly jwtService: JwtService,
+  ) { }
+
+  async create(createUserDto: CreateUserDto) {
     try {
       const { password, ...userData } = createUserDto;
 
@@ -37,7 +38,7 @@ export class AuthService {
 
       return {
         ...user,
-        token: this.getJwtToken({ email: user.email }),
+        token: this.getJwtToken({ id: user.id }),
       };
     } catch (error) {
       this.handleDBErrors(error);
@@ -49,17 +50,24 @@ export class AuthService {
 
     const user = await this.userRepository.findOne({
       where: { email },
-      select: { email: true, password: true },
+      select: { email: true, password: true, id: true },
     });
 
-    if (!user) throw new UnauthorizedException("Credential are not valid!");
+    if (!user) throw new UnauthorizedException("Credentials are not valid!");
 
     if (!bcrypt.compareSync(password, user.password))
-      throw new UnauthorizedException("Credential are not valid!");
+      throw new UnauthorizedException("Credentials are not valid!");
 
     return {
       ...user,
-      token: this.getJwtToken({ email: user.email }),
+      token: this.getJwtToken({ id: user.id }),
+    };
+  }
+
+  async checkAuthStatus(user: User) {
+    return {
+      ...user,
+      token: this.getJwtToken({ id: user.id }),
     };
   }
 
@@ -69,8 +77,12 @@ export class AuthService {
   }
 
   private handleDBErrors(error: any): never {
-    if (error.code === "23505") throw new BadRequestException(error.detail);
+
+    if (error.code === "23505")
+      throw new BadRequestException(error.detail);
+
     console.log(error);
+
     throw new InternalServerErrorException("Please check server log");
   }
 }

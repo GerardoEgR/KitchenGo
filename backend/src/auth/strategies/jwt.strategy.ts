@@ -9,9 +9,11 @@ import { JwtPayload } from "../interfaces/jwt-payload.interface";
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
+
   constructor(
     @InjectRepository(User)
-    private readonly userRespository: Repository<User>,
+    private readonly userRepository: Repository<User>,
+
     configService: ConfigService,
   ) {
     super({
@@ -21,10 +23,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload): Promise<User> {
-    const { email } = payload;
-    const user = await this.userRespository.findOneBy({ email });
+    const { id } = payload;
+
+    const user = await this.userRepository.findOneBy({ id });
 
     if (!user) throw new UnauthorizedException("Token not valid");
+
     if (!user.isActive)
       throw new UnauthorizedException(
         "The user is inactive, talk to an administrator",
